@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Badge } from "@/components/ui";
+import { Badge, ProgressBar } from "@/components/ui";
 import { PRIORITY, TASK_STATUS } from "@/lib/labels";
 import { formatJst, isOverdue } from "@/lib/time";
 import type { Task } from "@/lib/types";
@@ -34,6 +34,12 @@ export function TaskCard({ task, showStatus = false }: { task: TaskWithEmployee;
         {(showStatus || task.status === "ready") && <Badge className={st.className}>{st.label}</Badge>}
         {task.approval_type !== "none" && <span title="承認必須">🔒承認必須</span>}
       </div>
+      {task.status === "running" && (
+        <div className="mt-2 flex items-center gap-2 text-xs text-sky-300">
+          <ProgressBar value={task.progress} className="flex-1" />
+          <span className="tabular-nums">{task.progress}%</span>
+        </div>
+      )}
     </Link>
   );
 }

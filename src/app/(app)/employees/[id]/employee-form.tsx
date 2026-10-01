@@ -33,7 +33,7 @@ export function EmployeeForm({
       <Field label="禁止事項">
         <textarea name="prohibitions" rows={3} defaultValue={employee.prohibitions} className={inputClass} />
       </Field>
-      <Field label="System prompt(個別の指針)" hint="全社員共通ルール(未成年配慮・取り消せない行為は案として提出 等)は常に自動で先頭に付きます">
+      <Field label="個別の指針(Claude が作業時に読みます)" hint="全社員共通ルール(未成年配慮・取り消せない行為は案として提出 等)は「Claude の使い方」の指示文に含まれます">
         <textarea name="system_prompt" rows={8} defaultValue={employee.system_prompt} className={`${inputClass} font-mono text-sm`} />
       </Field>
       <label className="flex min-h-11 items-center gap-3 text-sm">

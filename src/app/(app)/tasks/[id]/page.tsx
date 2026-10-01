@@ -5,17 +5,20 @@ import { requireOwner } from "@/lib/auth";
 import { APPROVAL_STATUS, APPROVAL_TYPE, PRIORITY, TASK_STATUS } from "@/lib/labels";
 import { formatJst, isOverdue } from "@/lib/time";
 import type { Approval, Task, TaskComment, TaskRun } from "@/lib/types";
-import { Badge, Button, Card, LinkButton, PageHeader } from "@/components/ui";
+import { Badge, Button, Card, LinkButton, PageHeader, ProgressBar } from "@/components/ui";
 import { Markdown } from "@/components/markdown";
 import { ConfirmButton } from "@/components/confirm-button";
-import { addComment, deleteTask, markDone } from "../actions";
-import { RunPanel } from "./run-panel";
+import { addComment, deleteTask, markDone, requestRevision, submitResult, updateProgress } from "../actions";
+import { ProgressPanel } from "./progress-panel";
 import { CommentForm } from "./comment-form";
 
 export const metadata: Metadata = { title: "タスク詳細" };
 
+const AUTHOR = { owner: "オーナー", claude: "Claude", system: "システム" } as const;
+
 const COMMENT_KIND = {
   comment: { label: "コメント", className: "bg-slate-700 text-slate-100" },
+  progress: { label: "進捗", className: "bg-sky-800 text-sky-100" },
   revision: { label: "修正依頼", className: "bg-sky-700 text-white" },
   rejection: { label: "差し戻し", className: "bg-rose-600 text-white" },
 };
@@ -33,10 +36,28 @@ export default async function TaskDetailPage({ params }: PageProps<"/tasks/[id]"
   if (!task) notFound();
 
   const st = TASK_STATUS[task.status];
-  const latest = runs?.[0] ?? null;
   const latestSucceeded = runs?.find((r) => r.status === "succeeded") ?? null;
   const pendingApproval = approvals?.find((a) => a.status === "pending");
   const overdue = isOverdue(task.due_at, task.status);
+  const projectRef = (() => {
+    try {
+      return new URL(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").hostname.split(".")[0];
+    } catch {
+      return "";
+    }
+  })();
+  const askClaudeText = [
+    `CALLOUT HQ のタスクを進めてください。(Supabase プロジェクト: ${projectRef} / タスクID: ${id})`,
+    `担当役割: ${task.employees?.name ?? "未設定"} / 承認種別: ${task.approval_type === "none" ? "なし" : APPROVAL_TYPE[task.approval_type].label}`,
+    "",
+    "1. まず tasks / employees / task_comments / task_runs を読み、指示・担当社員の指針・オーナーのコメント(修正依頼・差し戻し)を把握する",
+    `2. 作業を始めたら: select hq_log('${id}', '着手しました', 10, 'running');`,
+    `3. 区切りごとに: select hq_log('${id}', '進捗メモ', 50);`,
+    `4. 完成したら: select hq_submit_result('${id}', '<Markdown の成果物>', '提出メモ');`,
+    "",
+    "送信・公開・投稿・支払い・本番反映などは実行せず、案として提出すること。承認・差し戻しはオーナーがアプリで行うので、承認の操作はしないこと。",
+    "判断が必要な点は成果物の最後に「## 要判断事項」として書くこと。詳しいルールはアプリの /guide を参照。",
+  ].join("\n");
 
   return (
     <>
@@ -78,6 +99,12 @@ export default async function TaskDetailPage({ params }: PageProps<"/tasks/[id]"
               </dd>
             </div>
           </dl>
+          {(task.status === "running" || task.progress > 0) && task.status !== "done" && (
+            <div className="flex items-center gap-2 text-xs text-sky-300">
+              <ProgressBar value={task.progress} className="flex-1" />
+              <span className="tabular-nums">{task.progress}%</span>
+            </div>
+          )}
           {task.instruction && (
             <details open={!latestSucceeded}>
               <summary className="cursor-pointer text-sm font-semibold text-muted">指示</summary>
@@ -119,20 +146,23 @@ export default async function TaskDetailPage({ params }: PageProps<"/tasks/[id]"
           </Card>
         )}
 
-        <RunPanel
-          key={latest?.id ?? "none"}
-          taskId={id}
-          taskStatus={task.status}
-          latestRun={latest ? { version: latest.version, status: latest.status, output_md: latest.output_md, error: latest.error } : null}
-          hasEmployee={!!task.employee_id}
+        <ProgressPanel
+          status={task.status}
+          progress={task.progress}
+          hasResult={!!latestSucceeded}
+          askClaudeText={askClaudeText}
+          updateProgress={updateProgress.bind(null, id)}
+          submitResult={submitResult.bind(null, id)}
+          requestRevision={requestRevision.bind(null, id)}
         />
 
         <section className="space-y-2">
-          <h3 className="text-sm font-bold text-muted">コメント・修正依頼</h3>
+          <h3 className="text-sm font-bold text-muted">進捗・やりとり</h3>
           {(comments ?? []).map((c) => (
             <div key={c.id} className="rounded-xl bg-surface p-3 text-sm">
               <div className="mb-1 flex items-center gap-2 text-xs text-muted">
                 <Badge className={COMMENT_KIND[c.kind].className}>{COMMENT_KIND[c.kind].label}</Badge>
+                <span className="font-semibold text-fg">{AUTHOR[c.author]}</span>
                 {formatJst(c.created_at)}
               </div>
               <p className="whitespace-pre-wrap">{c.body}</p>
@@ -166,7 +196,7 @@ export default async function TaskDetailPage({ params }: PageProps<"/tasks/[id]"
                   </summary>
                   <div className="mt-2 space-y-2">
                     <p className="text-xs text-muted">
-                      {r.model} / 入力 {r.tokens_in.toLocaleString()} ・出力 {r.tokens_out.toLocaleString()} tokens
+                      提出元: {r.model === "owner" ? "オーナー(貼り付け)" : "Claude"}
                     </p>
                     {r.revision_note && <p className="text-xs text-sky-300">修正依頼: {r.revision_note}</p>}
                     {r.error && <p className="text-sm text-rose-300">エラー: {r.error}</p>}

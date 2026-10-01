@@ -11,10 +11,6 @@ export type ApprovalStatus = "pending" | "approved" | "rejected" | "superseded";
 
 export interface Settings {
   owner_id: string;
-  claude_model: string;
-  max_tokens_per_run: number;
-  monthly_token_limit: number;
-  stop_on_limit: boolean;
   company_name: string;
   company_address: string;
   invoice_registration_number: string;
@@ -44,6 +40,7 @@ export interface Task {
   due_at: string | null;
   status: TaskStatus;
   approval_type: ApprovalType;
+  progress: number;
   created_at: string;
   updated_at: string;
 }
@@ -68,8 +65,8 @@ export interface TaskComment {
   task_id: string;
   task_run_id: string | null;
   body: string;
-  author: "owner" | "system";
-  kind: "comment" | "revision" | "rejection";
+  author: "owner" | "claude" | "system";
+  kind: "comment" | "progress" | "revision" | "rejection";
   created_at: string;
 }
 

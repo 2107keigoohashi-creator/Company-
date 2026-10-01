@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { requireOwner } from "@/lib/auth";
 import type { Employee } from "@/lib/types";
-import { Badge, PageHeader } from "@/components/ui";
+import { Badge, LinkButton, PageHeader } from "@/components/ui";
 
 export const metadata: Metadata = { title: "社員" };
 
@@ -19,7 +19,17 @@ export default async function EmployeesPage() {
 
   return (
     <>
-      <PageHeader title="AI社員" />
+      <PageHeader
+        title="AI社員"
+        action={
+          <LinkButton href="/guide" variant="secondary" className="!min-h-10 px-3 text-xs">
+            Claude の使い方
+          </LinkButton>
+        }
+      />
+      <p className="mb-3 text-xs text-muted">
+        作業は Claude(claude.ai / Claude Code)に頼みます。ここでは社員ごとの役割と指針を管理し、Claude が作業時に参照します。
+      </p>
       <ul className="space-y-2">
         {(employees ?? []).map((e) => (
           <li key={e.id}>

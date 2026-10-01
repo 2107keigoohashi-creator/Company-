@@ -1,13 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { requireOwner } from "@/lib/auth";
-import { getSettings, monthlyUsage } from "@/lib/ai/usage";
 import { monthRange, shiftMonth, todayJst, yen } from "@/lib/money";
 import { INVOICE_STATUS } from "@/lib/accounting";
 import type { Invoice } from "@/lib/types";
 import { Badge, Card, Empty, PageHeader } from "@/components/ui";
 import { MonthNav, resolveMonth } from "@/components/month-nav";
-import { UsageCard } from "@/components/usage-card";
 import { CategoryChart, TrendChart, type TrendPoint } from "./charts";
 
 export const metadata: Metadata = { title: "経理ダッシュボード" };
@@ -29,13 +27,11 @@ export default async function AccountingDashboard({ searchParams }: PageProps<"/
   const today = todayJst();
   const soon = new Date(Date.parse(today) + 7 * 86400_000).toISOString().slice(0, 10);
 
-  const [{ data: sales }, { data: expenses }, { data: invoices }, { count: draftCount }, settings, usage] = await Promise.all([
+  const [{ data: sales }, { data: expenses }, { data: invoices }, { count: draftCount }] = await Promise.all([
     supabase.from("sales").select("date, amount_excl").gte("date", from).lt("date", to),
     supabase.from("expenses").select("date, amount_excl, category").eq("status", "confirmed").gte("date", from).lt("date", to),
     supabase.from("invoices").select("*").eq("status", "confirmed").order("due_date", { ascending: true, nullsFirst: false }).returns<Invoice[]>(),
     supabase.from("expenses").select("id", { count: "exact", head: true }).eq("status", "draft"),
-    getSettings(supabase),
-    monthlyUsage(supabase),
   ]);
 
   const months = Array.from({ length: TREND_MONTHS }, (_, i) => shiftMonth(firstMonth, i));
@@ -152,7 +148,6 @@ export default async function AccountingDashboard({ searchParams }: PageProps<"/
           )}
         </Card>
 
-        <UsageCard usage={usage} settings={settings} />
       </div>
     </>
   );

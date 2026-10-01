@@ -80,6 +80,83 @@ export async function deleteTask(id: string) {
   redirect("/tasks");
 }
 
+/** 進捗の更新(オーナーが手で記録する場合)。状態は 未着手/実行中 のみ。 */
+export async function updateProgress(id: string, _prev: FormState, formData: FormData): Promise<FormState> {
+  const { supabase, user } = await requireOwner();
+  const parsed = z
+    .object({
+      progress: z.coerce.number().int().min(0).max(100),
+      status: z.enum(["todo", "running"]),
+      note: z.string().trim().max(5000).default(""),
+    })
+    .safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return { error: "入力内容を確認してください" };
+  const { error } = await supabase
+    .from("tasks")
+    .update({ progress: parsed.data.progress, status: parsed.data.status })
+    .eq("id", id);
+  if (error) return { error: error.message };
+  await supabase.from("task_comments").insert({
+    owner_id: user.id,
+    task_id: id,
+    body: parsed.data.note || `進捗 ${parsed.data.progress}%`,
+    author: "owner",
+    kind: "progress",
+  });
+  await audit(supabase, user.id, {
+    actor: "owner",
+    action: "task.progress",
+    targetType: "task",
+    targetId: id,
+    detail: { progress: parsed.data.progress, status: parsed.data.status },
+  });
+  revalidatePath(`/tasks/${id}`);
+  revalidatePath("/tasks");
+  return {};
+}
+
+/** Claude の成果物(Markdown)を貼り付けて登録する。承認が必要なタスクは「承認待ち」になる。 */
+export async function submitResult(id: string, _prev: FormState, formData: FormData): Promise<FormState> {
+  const { supabase } = await requireOwner();
+  const output = String(formData.get("output_md") ?? "");
+  const note = String(formData.get("note") ?? "").trim();
+  if (!output.trim()) return { error: "成果物を貼り付けてください" };
+  if (output.length > 200_000) return { error: "成果物が長すぎます(20万文字まで)" };
+  const { error } = await supabase.rpc("submit_result_as_owner", {
+    p_task_id: id,
+    p_output_md: output,
+    p_note: note || null,
+  });
+  if (error) return { error: error.message };
+  revalidatePath(`/tasks/${id}`);
+  revalidatePath("/tasks");
+  revalidatePath("/approvals");
+  return {};
+}
+
+/** 修正依頼: 承認待ちを無効化してタスクを「未着手」に戻し、依頼内容を記録する(Claude が次に拾う)。 */
+export async function requestRevision(id: string, _prev: FormState, formData: FormData): Promise<FormState> {
+  const { supabase, user } = await requireOwner();
+  const body = String(formData.get("body") ?? "").trim();
+  if (!body) return { error: "修正してほしい内容を入力してください" };
+  const { error: supErr } = await supabase.rpc("supersede_pending_approvals", { p_task_id: id });
+  if (supErr) return { error: supErr.message };
+  const { error } = await supabase.from("tasks").update({ status: "todo", progress: 0 }).eq("id", id);
+  if (error) return { error: error.message };
+  await supabase.from("task_comments").insert({
+    owner_id: user.id,
+    task_id: id,
+    body: body.slice(0, 10000),
+    author: "owner",
+    kind: "revision",
+  });
+  await audit(supabase, user.id, { actor: "owner", action: "task.revision_requested", targetType: "task", targetId: id });
+  revalidatePath(`/tasks/${id}`);
+  revalidatePath("/tasks");
+  revalidatePath("/approvals");
+  return {};
+}
+
 /** 承認済み(実行可)/承認不要タスクを「完了」にする。承認必須タスクは DB 側でも ready 以外から完了にできない。 */
 export async function markDone(id: string) {
   const { supabase, user } = await requireOwner();

@@ -97,3 +97,18 @@ export function ErrorBox({ message }: { message?: string | null }) {
 export function Empty({ children }: { children: ReactNode }) {
   return <p className="rounded-xl border border-dashed border-line p-6 text-center text-sm text-muted">{children}</p>;
 }
+
+export function ProgressBar({ value, className = "" }: { value: number; className?: string }) {
+  return (
+    <div
+      className={`h-2 overflow-hidden rounded-full bg-surface-2 ${className}`}
+      role="progressbar"
+      aria-valuenow={value}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-label="進捗"
+    >
+      <div className="h-full rounded-full bg-accent transition-all" style={{ width: `${value}%` }} />
+    </div>
+  );
+}

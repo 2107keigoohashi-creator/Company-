@@ -19,34 +19,10 @@ export function MoneyForm(props: Props) {
   const [rate, setRate] = useState(row?.tax_rate ?? 10);
   const [category, setCategory] = useState(row?.category ?? "");
   const expense = kind === "expense" ? props.row : undefined;
-  const [aiNote, setAiNote] = useState(expense?.ai_note ?? "");
-  const [suggesting, setSuggesting] = useState(false);
-  const [suggestError, setSuggestError] = useState<string | null>(null);
 
   const n = Number(amount);
   const preview = amount && Number.isFinite(n) ? splitTax(n, rate, mode) : null;
   const categories = kind === "sale" ? SALES_CATEGORIES : EXPENSE_CATEGORIES;
-
-  async function suggest(form: HTMLFormElement) {
-    const fd = new FormData(form);
-    setSuggesting(true);
-    setSuggestError(null);
-    try {
-      const res = await fetch("/api/accounting/expense-category", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ vendor: fd.get("vendor"), note: fd.get("note"), amount: preview?.amount }),
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error ?? "提案を取得できませんでした");
-      setCategory(json.category);
-      setAiNote(`経理AIの提案: ${json.category} — ${json.reason}`);
-    } catch (e) {
-      setSuggestError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setSuggesting(false);
-    }
-  }
 
   return (
     <form action={formAction} className="space-y-4">
@@ -116,23 +92,9 @@ export function MoneyForm(props: Props) {
       </Field>
 
       {kind === "expense" && (
-        <div className="space-y-2">
-          <Button
-            type="button"
-            variant="secondary"
-            className="w-full"
-            disabled={suggesting}
-            onClick={(e) => suggest(e.currentTarget.form!)}
-          >
-            {suggesting ? "経理が確認中…" : "🧾 経理に分類を提案させる"}
-          </Button>
-          <input type="hidden" name="ai_note" value={aiNote} />
-          {aiNote && <p className="rounded-xl bg-surface-2 p-3 text-xs text-accent">{aiNote}</p>}
-          <ErrorBox message={suggestError} />
-          <p className="text-xs text-muted">
-            ※ 分類は候補です。税務上の扱いは断定できないため、判断に迷うものは税理士など専門家に確認してください。
-          </p>
-        </div>
+        <p className="text-xs text-muted">
+          ※ 分類は目安です。税務上の扱いは断定できないため、判断に迷うものは税理士など専門家に確認してください。
+        </p>
       )}
 
       {kind === "sale" ? (

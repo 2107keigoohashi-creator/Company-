@@ -3,7 +3,7 @@ import { defineConfig } from "@playwright/test";
 const PORT = Number(process.env.E2E_PORT ?? 3000);
 
 /**
- * E2E はローカル Supabase(npx supabase start)と AI_MOCK=1 で実行する。
+ * E2E はローカル Supabase(npx supabase start)で実行する。
  * 必要な環境変数は .env.local / README を参照。
  */
 export default defineConfig({
@@ -33,6 +33,5 @@ export default defineConfig({
     url: `http://localhost:${PORT}/login`,
     reuseExistingServer: true,
     timeout: 120_000,
-    env: { AI_MOCK: "1" },
   },
 });

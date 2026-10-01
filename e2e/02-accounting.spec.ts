@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-test("経費登録(経理AIの分類提案→確定)→ダッシュボードに反映", async ({ page }) => {
+test("経費登録(分類を選んで確定)→ダッシュボードに反映", async ({ page }) => {
   await page.goto("/accounting");
   await expect(page.getByTestId("kpi-expenses")).toContainText("￥0");
 
@@ -10,9 +10,7 @@ test("経費登録(経理AIの分類提案→確定)→ダッシュボードに�
   await expect(page.getByTestId("tax-preview")).toContainText("税抜 ￥10,000");
   await page.getByLabel("支払先").fill("Google 広告");
   await page.getByLabel("メモ").fill("10月のプロモーション");
-  await page.getByRole("button", { name: "🧾 経理に分類を提案させる" }).click();
-  await expect(page.getByText("経理AIの提案: 広告宣伝費")).toBeVisible();
-  await expect(page.getByLabel("勘定科目(分類)")).toHaveValue("広告宣伝費");
+  await page.getByLabel("勘定科目(分類)").selectOption("広告宣伝費");
   await page.getByRole("button", { name: "確認して確定" }).click();
 
   await expect(page).toHaveURL(/\/accounting\/expenses\?month=/);
@@ -22,7 +20,6 @@ test("経費登録(経理AIの分類提案→確定)→ダッシュボードに�
   await expect(page.getByTestId("kpi-expenses")).toContainText("￥10,000");
   await expect(page.getByTestId("kpi-profit")).toContainText("-￥10,000");
   await expect(page.getByText("経費カテゴリ別内訳")).toBeVisible();
-  await expect(page.getByTestId("usage-card")).toContainText("tokens");
 });
 
 test("下書きの経費はダッシュボードに含まれない", async ({ page }) => {
@@ -36,12 +33,16 @@ test("下書きの経費はダッシュボードに含まれない", async ({ pa
   await expect(page.getByTestId("kpi-expenses")).toContainText("￥10,000");
 });
 
-test("請求書: 経理AIで明細下書き→保存→確定→印刷画面", async ({ page }) => {
+test("請求書: 明細入力→保存→確定→印刷画面", async ({ page }) => {
   await page.goto("/accounting/invoices/new");
   await page.getByLabel("宛先(取引先名)").fill("株式会社テスト");
-  await page.getByText("🧾 経理に明細の下書きを作らせる").click();
-  await page.getByPlaceholder("例: 10月分のコーチング").fill("コーチング4回と教材制作");
-  await page.getByRole("button", { name: "下書きを作成(明細を置き換え)" }).click();
+  await page.getByLabel("品目").fill("英語コーチングセッション");
+  await page.getByLabel("数量").fill("4");
+  await page.getByLabel("単価").fill("5000");
+  await page.getByRole("button", { name: "＋ 明細を追加" }).click();
+  await page.getByLabel("品目").nth(1).fill("教材制作費");
+  await page.getByLabel("数量").nth(1).fill("1");
+  await page.getByLabel("単価").nth(1).fill("30000");
   await expect(page.getByTestId("invoice-total")).toHaveText("￥55,000");
   await page.getByRole("button", { name: "下書きとして保存" }).click();
   await expect(page).toHaveURL(/\/accounting\/invoices\/[0-9a-f-]{36}$/);

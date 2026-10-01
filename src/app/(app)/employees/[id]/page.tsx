@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { requireOwner } from "@/lib/auth";
-import { COMMON_RULES } from "@/lib/ai/rules";
+import { COMMON_RULES } from "@/lib/rules";
 import type { Employee } from "@/lib/types";
 import { PageHeader } from "@/components/ui";
 import { updateEmployee } from "../actions";

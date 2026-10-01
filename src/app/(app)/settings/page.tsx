@@ -1,10 +1,9 @@
 import type { Metadata } from "next";
 import { requireOwner } from "@/lib/auth";
-import { getSettings, monthlyUsage } from "@/lib/ai/usage";
+import { getSettings } from "@/lib/settings";
 import { formatJst } from "@/lib/time";
 import type { AuditLog } from "@/lib/types";
 import { Button, Card, PageHeader } from "@/components/ui";
-import { UsageCard } from "@/components/usage-card";
 import { SettingsForm } from "./settings-form";
 import { PasswordForm } from "./password-form";
 
@@ -12,9 +11,8 @@ export const metadata: Metadata = { title: "設定" };
 
 export default async function SettingsPage() {
   const { supabase, user } = await requireOwner();
-  const [settings, usage, { data: logs }] = await Promise.all([
+  const [settings, { data: logs }] = await Promise.all([
     getSettings(supabase),
-    monthlyUsage(supabase),
     supabase.from("audit_logs").select("*").order("created_at", { ascending: false }).limit(50).returns<AuditLog[]>(),
   ]);
 
@@ -22,7 +20,6 @@ export default async function SettingsPage() {
     <>
       <PageHeader title="設定" />
       <div className="space-y-6">
-        <UsageCard usage={usage} settings={settings} />
         <SettingsForm settings={settings} />
 
         <section className="space-y-2">

@@ -21,34 +21,10 @@ export function InvoiceForm({
   const [state, formAction, pending] = useActionState(action, undefined);
   const [items, setItems] = useState<InvoiceItem[]>(invoice?.items?.length ? invoice.items : [EMPTY_ITEM]);
   const [note, setNote] = useState(invoice?.note ?? "");
-  const [brief, setBrief] = useState("");
-  const [drafting, setDrafting] = useState(false);
-  const [draftError, setDraftError] = useState<string | null>(null);
-  const [draftNote, setDraftNote] = useState<string | null>(null);
   const totals = invoiceTotals(items.map((i) => ({ ...i, quantity: Number(i.quantity) || 0, unit_price: Number(i.unit_price) || 0 })));
 
   function update(idx: number, patch: Partial<InvoiceItem>) {
     setItems((xs) => xs.map((x, i) => (i === idx ? { ...x, ...patch } : x)));
-  }
-
-  async function draft(form: HTMLFormElement) {
-    setDrafting(true);
-    setDraftError(null);
-    try {
-      const res = await fetch("/api/accounting/invoice-draft", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ brief, client: new FormData(form).get("client") }),
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error ?? "下書きを作成できませんでした");
-      if (json.items?.length) setItems(json.items);
-      setDraftNote(json.note || null);
-    } catch (e) {
-      setDraftError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setDrafting(false);
-    }
   }
 
   return (
@@ -68,24 +44,6 @@ export function InvoiceForm({
           <input name="due_date" type="date" defaultValue={invoice?.due_date ?? ""} className={inputClass} />
         </Field>
       </div>
-
-      <details className="rounded-2xl border border-line bg-surface p-3">
-        <summary className="cursor-pointer text-sm font-semibold text-accent">🧾 経理に明細の下書きを作らせる</summary>
-        <div className="mt-3 space-y-2">
-          <textarea
-            rows={3}
-            value={brief}
-            onChange={(e) => setBrief(e.target.value)}
-            className={inputClass}
-            placeholder="例: 10月分のコーチング4回(1回5,000円)と教材制作費3万円"
-          />
-          <Button type="button" variant="secondary" className="w-full" disabled={drafting || !brief.trim()} onClick={(e) => draft(e.currentTarget.form!)}>
-            {drafting ? "作成中…" : "下書きを作成(明細を置き換え)"}
-          </Button>
-          <ErrorBox message={draftError} />
-          {draftNote && <p className="text-xs text-amber-200">経理メモ: {draftNote}</p>}
-        </div>
-      </details>
 
       <section className="space-y-3">
         <h3 className="text-sm font-bold text-muted">明細(単価は税抜)</h3>

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { requireOwner } from "@/lib/auth";
-import { getSettings } from "@/lib/ai/usage";
+import { getSettings } from "@/lib/settings";
 import { invoiceTotals, yen } from "@/lib/money";
 import type { Invoice } from "@/lib/types";
 import { PrintButton } from "./print-button";
