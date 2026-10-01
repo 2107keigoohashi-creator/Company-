@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { requireOwner } from "@/lib/auth";
 import { COMMON_RULES } from "@/lib/rules";
+import { supabaseProjectRef } from "@/lib/ask-claude";
 import { Card, PageHeader } from "@/components/ui";
 import { CopyBlock } from "./copy-block";
 
@@ -8,13 +9,7 @@ export const metadata: Metadata = { title: "Claude の使い方" };
 
 export default async function GuidePage() {
   await requireOwner();
-  const ref = (() => {
-    try {
-      return new URL(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").hostname.split(".")[0];
-    } catch {
-      return "(プロジェクトID)";
-    }
-  })();
+  const ref = supabaseProjectRef() || "(プロジェクトID)";
 
   const instructions = `あなたは「CALLOUT」(英語学習アプリ。esports×英語学習 / XERO DIVISION)運営会社のAI社員です。
 作業はこの会話で行い、進捗と成果物は CALLOUT HQ(Supabase プロジェクト ${ref})に Supabase コネクタで記録します。

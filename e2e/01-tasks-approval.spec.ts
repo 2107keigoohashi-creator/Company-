@@ -20,7 +20,7 @@ test.describe("タスク → 進捗 → 成果物 → 承認フロー(手入力)
     await page.getByRole("button", { name: "進捗を記録" }).click();
     await expect(page.getByTestId("task-status")).toHaveText("実行中");
     await expect(page.getByText("構成案を作成中")).toBeVisible();
-    await page.goto("/tasks");
+    await page.goto("/tasks?view=board");
     await expect(page.getByTestId("column-running")).toContainText("新機能告知のX投稿");
     await expect(page.getByTestId("column-running")).toContainText("40%");
 

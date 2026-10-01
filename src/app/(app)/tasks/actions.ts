@@ -6,6 +6,7 @@ import { z } from "zod";
 import { requireOwner } from "@/lib/auth";
 import { audit } from "@/lib/audit";
 import { fromJstInput } from "@/lib/time";
+import { buildAskClaudeText } from "@/lib/ask-claude";
 
 export type FormState = { error?: string } | undefined;
 
@@ -178,4 +179,49 @@ export async function addComment(id: string, _prev: FormState, formData: FormDat
   await audit(supabase, user.id, { actor: "owner", action: "task.commented", targetType: "task", targetId: id });
   revalidatePath(`/tasks/${id}`);
   return {};
+}
+
+export type InstructionState =
+  | { error?: string; created?: { id: string; title: string; employee: string; askText: string } }
+  | undefined;
+
+/** オフィス画面の「社長からの指示」: 1行目をタイトルにしてタスクを登録し、Claude への依頼文を返す */
+export async function quickInstruction(_prev: InstructionState, formData: FormData): Promise<InstructionState> {
+  const { supabase, user } = await requireOwner();
+  const body = String(formData.get("body") ?? "").trim();
+  if (!body) return { error: "指示を入力してください" };
+  const parsed = z
+    .object({
+      employee_id: z.string().uuid("担当を選んでください"),
+      approval_type: z.enum(["none", "external_post", "email_reply", "invoice_issue", "expense_confirm", "code_deploy"]),
+    })
+    .safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "入力内容を確認してください" };
+
+  const firstLine = body.split("\n")[0].trim();
+  const title = firstLine.length > 60 ? `${firstLine.slice(0, 60)}…` : firstLine;
+  const { data, error } = await supabase
+    .from("tasks")
+    .insert({ owner_id: user.id, title, instruction: body.slice(0, 10000), ...parsed.data })
+    .select("id, approval_type, employees(name)")
+    .single<{ id: string; approval_type: Parameters<typeof buildAskClaudeText>[0]["approvalType"]; employees: { name: string } | null }>();
+  if (error || !data) return { error: error?.message ?? "登録できませんでした" };
+
+  await audit(supabase, user.id, {
+    actor: "owner",
+    action: "task.created",
+    targetType: "task",
+    targetId: data.id,
+    detail: { title, via: "office" },
+  });
+  revalidatePath("/tasks");
+  const employee = data.employees?.name ?? "";
+  return {
+    created: {
+      id: data.id,
+      title,
+      employee,
+      askText: buildAskClaudeText({ taskId: data.id, employeeName: employee, approvalType: data.approval_type }),
+    },
+  };
 }

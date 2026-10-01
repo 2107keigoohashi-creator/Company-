@@ -2,9 +2,12 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { requireOwner } from "@/lib/auth";
 import { BOARD_COLUMNS, PRIORITY } from "@/lib/labels";
-import { jstBoundaries } from "@/lib/time";
+import { isOverdue, jstBoundaries } from "@/lib/time";
+import type { Employee, TaskComment, TaskStatus } from "@/lib/types";
 import { Empty, LinkButton, PageHeader } from "@/components/ui";
 import { TaskCard, type TaskWithEmployee } from "./task-card";
+import { OfficeView, type FeedItem } from "./office/office-view";
+import type { MemberStatus, OfficeMember } from "./office/office-map";
 
 export const metadata: Metadata = { title: "タスク" };
 
@@ -27,7 +30,8 @@ export default async function TasksPage({ searchParams }: PageProps<"/tasks">) {
     .limit(500)
     .returns<TaskWithEmployee[]>();
   const tasks = (data ?? []).sort(sortTasks);
-  const isSchedule = view === "schedule";
+  const mode = view === "schedule" ? "schedule" : view === "board" ? "board" : "office";
+  const office = mode === "office" ? await loadOffice(supabase, tasks) : null;
 
   return (
     <>
@@ -39,25 +43,32 @@ export default async function TasksPage({ searchParams }: PageProps<"/tasks">) {
           </LinkButton>
         }
       />
-      <div role="tablist" className="mb-4 grid grid-cols-2 rounded-xl border border-line bg-surface p-1 text-sm font-semibold">
-        <Link
-          role="tab"
-          aria-selected={!isSchedule}
-          href="/tasks"
-          className={`flex min-h-10 items-center justify-center rounded-lg ${!isSchedule ? "bg-surface-2 text-accent" : "text-muted"}`}
-        >
-          ボード
-        </Link>
-        <Link
-          role="tab"
-          aria-selected={isSchedule}
-          href="/tasks?view=schedule"
-          className={`flex min-h-10 items-center justify-center rounded-lg ${isSchedule ? "bg-surface-2 text-accent" : "text-muted"}`}
-        >
-          秘書ビュー(期限)
-        </Link>
+      <div role="tablist" className="mb-4 grid grid-cols-3 rounded-xl border border-line bg-surface p-1 text-sm font-semibold">
+        {(
+          [
+            ["office", "/tasks", "オフィス"],
+            ["board", "/tasks?view=board", "ボード"],
+            ["schedule", "/tasks?view=schedule", "秘書ビュー"],
+          ] as const
+        ).map(([key, href, label]) => (
+          <Link
+            key={key}
+            role="tab"
+            aria-selected={mode === key}
+            href={href}
+            className={`flex min-h-10 items-center justify-center rounded-lg ${mode === key ? "bg-surface-2 text-accent" : "text-muted"}`}
+          >
+            {label}
+          </Link>
+        ))}
       </div>
-      {isSchedule ? <ScheduleView tasks={tasks} /> : <BoardView tasks={tasks} />}
+      {office ? (
+        <OfficeView members={office.members} feed={office.feed} stats={office.stats} />
+      ) : mode === "schedule" ? (
+        <ScheduleView tasks={tasks} />
+      ) : (
+        <BoardView tasks={tasks} />
+      )}
     </>
   );
 }
@@ -136,4 +147,83 @@ function ScheduleView({ tasks }: { tasks: TaskWithEmployee[] }) {
       ))}
     </div>
   );
+}
+
+type Supabase = Awaited<ReturnType<typeof requireOwner>>["supabase"];
+
+const STATUS_PRIORITY: Record<string, number> = { running: 0, pending_approval: 1, rejected: 2, todo: 3 };
+
+/** 社員ごとの「今の状態」と「今のタスク」、最新の動きを組み立てる */
+async function loadOffice(supabase: Supabase, tasks: TaskWithEmployee[]) {
+  const [{ data: employees }, { data: comments }, { data: runs }] = await Promise.all([
+    supabase.from("employees").select("*").order("sort_order").returns<Employee[]>(),
+    supabase
+      .from("task_comments")
+      .select("id, body, author, kind, created_at, task_id, tasks(title)")
+      .order("created_at", { ascending: false })
+      .limit(8)
+      .returns<(TaskComment & { tasks: { title: string } | null })[]>(),
+    supabase
+      .from("task_runs")
+      .select("id, version, model, created_at, task_id, tasks(title)")
+      .eq("status", "succeeded")
+      .order("created_at", { ascending: false })
+      .limit(8)
+      .returns<{ id: string; version: number; model: string; created_at: string; task_id: string; tasks: { title: string } | null }[]>(),
+  ]);
+
+  const members: OfficeMember[] = (employees ?? []).map((e) => {
+    const open = tasks
+      .filter((t) => t.employee_id === e.id && t.status in STATUS_PRIORITY)
+      .sort((a, b) => STATUS_PRIORITY[a.status] - STATUS_PRIORITY[b.status] || sortTasks(a, b));
+    const top = open[0];
+    const status: MemberStatus = !e.enabled
+      ? "off"
+      : !top
+        ? "idle"
+        : ({ running: "working", pending_approval: "review", rejected: "rejected", todo: "queued" } as const)[
+            top.status as "running" | "pending_approval" | "rejected" | "todo"
+          ];
+    return {
+      id: e.id,
+      key: e.key,
+      name: e.name,
+      role: e.role,
+      responsibilities: e.responsibilities,
+      enabled: e.enabled,
+      status,
+      current: top ? { id: top.id, title: top.title, progress: top.progress, status: top.status } : null,
+      open: open.slice(0, 6).map((t) => ({ id: t.id, title: t.title, status: t.status as TaskStatus, progress: t.progress })),
+    };
+  });
+
+  const KIND = { comment: "コメント", progress: "進捗", revision: "修正依頼", rejection: "差し戻し" } as const;
+  const feed: FeedItem[] = [
+    ...(comments ?? []).map((c) => ({
+      id: `c-${c.id}`,
+      at: c.created_at,
+      actor: c.author,
+      text: `${KIND[c.kind]}: ${c.body}`,
+      taskId: c.task_id,
+      taskTitle: c.tasks?.title ?? "",
+    })),
+    ...(runs ?? []).map((r) => ({
+      id: `r-${r.id}`,
+      at: r.created_at,
+      actor: (r.model === "owner" ? "owner" : "claude") as FeedItem["actor"],
+      text: `成果物 v${r.version} を提出`,
+      taskId: r.task_id,
+      taskTitle: r.tasks?.title ?? "",
+    })),
+  ]
+    .sort((a, b) => b.at.localeCompare(a.at))
+    .slice(0, 8);
+
+  const weekAgo = Date.now() - 7 * 86400_000;
+  const stats = {
+    pendingApprovals: tasks.filter((t) => t.status === "pending_approval").length,
+    overdue: tasks.filter((t) => isOverdue(t.due_at, t.status)).length,
+    doneThisWeek: tasks.filter((t) => (t.status === "done" || t.status === "ready") && new Date(t.updated_at).getTime() >= weekAgo).length,
+  };
+  return { members, feed, stats };
 }

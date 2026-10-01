@@ -129,3 +129,48 @@ body {
     display: none !important;
   }
 }
+
+/* オフィスビュー: スマホ幅のレイアウトから横に広げる */
+body {
+  overflow-x: clip;
+}
+.office-wide {
+  position: relative;
+  left: 50%;
+  width: min(72rem, calc(100vw - 2rem));
+  transform: translateX(-50%);
+}
+
+@keyframes office-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+@keyframes office-led {
+  0%,
+  60%,
+  100% {
+    opacity: 1;
+  }
+  70% {
+    opacity: 0.2;
+  }
+}
+.office-pulse,
+.office-screen {
+  animation: office-pulse 2.4s ease-in-out infinite;
+}
+.office-led {
+  animation: office-led 2.8s steps(1) infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .office-pulse,
+  .office-screen,
+  .office-led {
+    animation: none;
+  }
+}

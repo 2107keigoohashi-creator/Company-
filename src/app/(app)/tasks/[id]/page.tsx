@@ -10,6 +10,7 @@ import { Markdown } from "@/components/markdown";
 import { ConfirmButton } from "@/components/confirm-button";
 import { addComment, deleteTask, markDone, requestRevision, submitResult, updateProgress } from "../actions";
 import { ProgressPanel } from "./progress-panel";
+import { buildAskClaudeText } from "@/lib/ask-claude";
 import { CommentForm } from "./comment-form";
 
 export const metadata: Metadata = { title: "タスク詳細" };
@@ -39,25 +40,11 @@ export default async function TaskDetailPage({ params }: PageProps<"/tasks/[id]"
   const latestSucceeded = runs?.find((r) => r.status === "succeeded") ?? null;
   const pendingApproval = approvals?.find((a) => a.status === "pending");
   const overdue = isOverdue(task.due_at, task.status);
-  const projectRef = (() => {
-    try {
-      return new URL(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").hostname.split(".")[0];
-    } catch {
-      return "";
-    }
-  })();
-  const askClaudeText = [
-    `CALLOUT HQ のタスクを進めてください。(Supabase プロジェクト: ${projectRef} / タスクID: ${id})`,
-    `担当役割: ${task.employees?.name ?? "未設定"} / 承認種別: ${task.approval_type === "none" ? "なし" : APPROVAL_TYPE[task.approval_type].label}`,
-    "",
-    "1. まず tasks / employees / task_comments / task_runs を読み、指示・担当社員の指針・オーナーのコメント(修正依頼・差し戻し)を把握する",
-    `2. 作業を始めたら: select hq_log('${id}', '着手しました', 10, 'running');`,
-    `3. 区切りごとに: select hq_log('${id}', '進捗メモ', 50);`,
-    `4. 完成したら: select hq_submit_result('${id}', '<Markdown の成果物>', '提出メモ');`,
-    "",
-    "送信・公開・投稿・支払い・本番反映などは実行せず、案として提出すること。承認・差し戻しはオーナーがアプリで行うので、承認の操作はしないこと。",
-    "判断が必要な点は成果物の最後に「## 要判断事項」として書くこと。詳しいルールはアプリの /guide を参照。",
-  ].join("\n");
+  const askClaudeText = buildAskClaudeText({
+    taskId: id,
+    employeeName: task.employees?.name ?? null,
+    approvalType: task.approval_type,
+  });
 
   return (
     <>
