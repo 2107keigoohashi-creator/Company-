@@ -5,27 +5,10 @@
 --  * 承認・差し戻しは従来どおり decide_approval()(オーナーのログイン必須)のみ。hq_* には承認を行う関数はない
 
 -- ---------------------------------------------------------------------------
--- 1. Claude API 関連の撤去
--- ---------------------------------------------------------------------------
-drop table if exists public.ai_usage;
-alter table public.settings
-  drop column if exists claude_model,
-  drop column if exists max_tokens_per_run,
-  drop column if exists monthly_token_limit,
-  drop column if exists stop_on_limit;
-
--- ---------------------------------------------------------------------------
 -- 2. 進捗の記録
 -- ---------------------------------------------------------------------------
 alter table public.tasks
   add column if not exists progress smallint not null default 0 check (progress between 0 and 100);
-
-alter table public.task_comments drop constraint if exists task_comments_author_check;
-alter table public.task_comments add constraint task_comments_author_check
-  check (author in ('owner', 'claude', 'system'));
-alter table public.task_comments drop constraint if exists task_comments_kind_check;
-alter table public.task_comments add constraint task_comments_kind_check
-  check (kind in ('comment', 'progress', 'revision', 'rejection'));
 
 -- 成果物の提出元(model 列に残っている AI モデル名は意味を変える)
 alter table public.task_runs alter column model set default '';
@@ -47,7 +30,6 @@ declare
   v integer;
   rid uuid;
   next_status text;
-  label record;
 begin
   if coalesce(btrim(p_output_md), '') = '' then
     raise exception '成果物が空です' using errcode = '22023';
