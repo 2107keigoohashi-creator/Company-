@@ -102,7 +102,7 @@ export function RunPanel({
         </div>
       )}
       {!error && lastFailed && !streaming && !output && (
-        <ErrorBox message={`前回の実行(v${latestRun?.version})が失敗しました: ${latestRun?.error ?? "不明なエラー"}`} />
+        <ErrorBox message={`実行に失敗しました(v${latestRun?.version}): ${latestRun?.error ?? "不明なエラー"}`} />
       )}
 
       <div className="grid gap-2">
