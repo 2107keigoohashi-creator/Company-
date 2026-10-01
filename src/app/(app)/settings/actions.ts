@@ -43,3 +43,15 @@ export async function saveSettings(_prev: SettingsState, formData: FormData): Pr
   revalidatePath("/settings");
   return { saved: true };
 }
+
+export async function changePassword(_prev: SettingsState, formData: FormData): Promise<SettingsState> {
+  const { supabase, user } = await requireOwner();
+  const password = String(formData.get("password") ?? "");
+  const confirm = String(formData.get("confirm") ?? "");
+  if (password.length < 12) return { error: "パスワードは12文字以上にしてください" };
+  if (password !== confirm) return { error: "確認用パスワードが一致しません" };
+  const { error } = await supabase.auth.updateUser({ password });
+  if (error) return { error: `変更できませんでした: ${error.message}` };
+  await audit(supabase, user.id, { actor: "owner", action: "auth.password_changed", targetType: "user" });
+  return { saved: true };
+}

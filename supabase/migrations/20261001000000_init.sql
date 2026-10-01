@@ -13,6 +13,7 @@ create extension if not exists pgcrypto;
 create or replace function public.touch_updated_at()
 returns trigger
 language plpgsql
+set search_path = ''
 as $$
 begin
   new.updated_at = now();
@@ -88,6 +89,7 @@ create trigger tasks_touch before update on public.tasks
 create or replace function public.guard_task_status()
 returns trigger
 language plpgsql
+set search_path = ''
 as $$
 declare
   via_decision boolean := coalesce(current_setting('app.approval_decision', true), '') = 'owner';
@@ -490,4 +492,5 @@ begin
   on conflict (owner_id, key) do nothing;
 end;
 $$;
+revoke all on function public.bootstrap_owner() from public, anon;
 grant execute on function public.bootstrap_owner() to authenticated;

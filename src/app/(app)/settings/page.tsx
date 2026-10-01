@@ -6,6 +6,7 @@ import type { AuditLog } from "@/lib/types";
 import { Button, Card, PageHeader } from "@/components/ui";
 import { UsageCard } from "@/components/usage-card";
 import { SettingsForm } from "./settings-form";
+import { PasswordForm } from "./password-form";
 
 export const metadata: Metadata = { title: "設定" };
 
@@ -42,6 +43,8 @@ export default async function SettingsPage() {
             {(logs ?? []).length === 0 && <p className="p-3 text-sm text-muted">まだ記録がありません</p>}
           </Card>
         </section>
+
+        <PasswordForm />
 
         <Card className="space-y-3">
           <p className="text-sm text-muted">ログイン中: {user.email}</p>

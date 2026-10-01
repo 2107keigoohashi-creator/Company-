@@ -30,10 +30,20 @@ cp .env.example .env.local   # 値を埋める
 
 ### 2. Supabase
 
+> **セットアップ済みの本番プロジェクト**: `CALLOUT HQ`(ref `zbnwrsgmxyfbbiycmtzc`、東京リージョン)。
+> `supabase/migrations/` の 3 ファイルは適用済み、オーナーアカウントと 8 人の AI社員も作成済みです。
+>
+> ```
+> NEXT_PUBLIC_SUPABASE_URL=https://zbnwrsgmxyfbbiycmtzc.supabase.co
+> NEXT_PUBLIC_SUPABASE_ANON_KEY=(ダッシュボード > Project Settings > API Keys の anon / publishable キー)
+> ```
+>
+> 残りの手動作業: 下記 3(新規登録をオフ)。以下は新しく作り直す場合の手順です。
+
 1. Supabase で新規プロジェクトを作成
 2. マイグレーションを適用(どちらか)
    - CLI: `npx supabase link --project-ref <ref>` → `npx supabase db push`
-   - ダッシュボードの SQL Editor で `supabase/migrations/20261001000000_init.sql` を実行
+   - ダッシュボードの SQL Editor で `supabase/migrations/` の各ファイルを番号順に実行
 3. **Authentication > Providers > Email** で「Allow new users to sign up」を **オフ**
 4. **Authentication > Users > Add user** でオーナーのアカウントを作成(メール + パスワード、Auto Confirm)
 5. `.env.local` に `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` / `OWNER_EMAIL`(4 で作ったメール)を設定
@@ -80,7 +90,7 @@ npm run dev     # http://localhost:3000
 | 承認 | 承認待ちの受信箱(内容プレビュー・担当・理由・影響)、承認 / 差し戻し、最近の判断 |
 | 経理 | ダッシュボード、売上、経費(下書き→確定)、請求書(下書き→確定→入金済、PDF 保存) |
 | 社員 | 8 人の AI社員の名前・役割・できること・禁止事項・system prompt の編集、有効/無効 |
-| 設定 | Claude のモデル・1実行あたりの上限・月次上限、請求書の自社情報、今月の利用量、監査ログ、ログアウト |
+| 設定 | Claude のモデル・1実行あたりの上限・月次上限、請求書の自社情報、今月の利用量、パスワード変更、監査ログ、ログアウト |
 
 ## 承認フローの安全設計
 
@@ -90,7 +100,7 @@ npm run dev     # http://localhost:3000
 - 承認・差し戻しは security definer 関数 `decide_approval()` だけが行える。オーナー操作の Server Action(`src/app/(app)/approvals/actions.ts`)からのみ呼び出し、AI 実行経路(`/api/tasks/[id]/run`)は呼ばない
 - `tasks.status` を `ready`(承認済・実行可)/ `rejected` にできるのは `decide_approval()` 経由のみ(トリガーで検証)。承認必須タスクは `ready` を経ずに `done` にできず、承認待ち中は承認種別も変更できない
 - 差し戻しはコメント必須(DB でも検証)。決定は監査ログに同一トランザクションで記録
-- `audit_logs` / `ai_usage` は追記のみ
+- `audit_logs` / `ai_usage` は追記のみ。RLS の対象外である TRUNCATE は全テーブルで剥奪
 - 全 AI社員の system prompt の先頭に、編集できない共通ルール(未成年配慮・「AI発音判定」と言わない・取り消せない行為は案として提出・口座/カード番号を扱わない・税務法務は専門家に要確認・「要判断事項」を明記)を付与(`src/lib/ai/rules.ts`)
 
 ## Claude API のコスト対策と試算
@@ -138,6 +148,7 @@ npm run test:e2e
 - 経費登録(経理AIの分類提案 → 確定)→ ダッシュボードに反映、下書きは集計外
 - 請求書(経理AIの明細下書き → 確定 → 印刷画面)、CSV エクスポート
 - 未ログイン時の全ページ拒否、オーナーのトークンでも承認状態を直接変更できないこと
+- 設定画面でのパスワード変更と、新しいパスワードでの再ログイン
 
 ## 仕様上の前提(開始前の確認事項への暫定対応)
 
