@@ -37,6 +37,7 @@ export default async function TasksPage({ searchParams }: PageProps<"/tasks">) {
     <>
       <PageHeader
         title="タスク"
+        wide={mode === "office"}
         action={
           <LinkButton href="/tasks/new" className="!min-h-10 px-3">
             ＋ 新規

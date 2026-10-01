@@ -42,24 +42,32 @@ export function Badge({ className = "", children }: { className?: string; childr
   );
 }
 
+/**
+ * 画面上部の固定ヘッダー。帯は画面いっぱいに広げ、中身は本文の幅にそろえる。
+ * (本文より広いオフィスビューでも、スクロールしたときに帯が途中で切れて重ならない)
+ */
 export function PageHeader({
   title,
   back,
   action,
+  wide = false,
 }: {
   title: string;
   back?: string;
   action?: ReactNode;
+  wide?: boolean;
 }) {
   return (
-    <header className="sticky top-0 z-20 -mx-4 mb-4 flex min-h-14 items-center gap-2 border-b border-line bg-bg/90 px-4 backdrop-blur">
-      {back && (
-        <Link href={back} aria-label="戻る" className="-ml-2 flex h-11 w-11 items-center justify-center text-xl text-muted">
-          ‹
-        </Link>
-      )}
-      <h1 className="flex-1 truncate text-lg font-bold tracking-wide">{title}</h1>
-      {action}
+    <header className="sticky top-0 z-30 mb-4 ml-[calc(50%-50vw)] w-screen border-b border-line bg-bg/95 backdrop-blur">
+      <div className={`mx-auto flex min-h-14 items-center gap-2 px-4 ${wide ? "max-w-[74rem]" : "max-w-xl"}`}>
+        {back && (
+          <Link href={back} aria-label="戻る" className="-ml-2 flex h-11 w-11 items-center justify-center text-xl text-muted">
+            ‹
+          </Link>
+        )}
+        <h1 className="flex-1 truncate text-lg font-bold tracking-wide">{title}</h1>
+        {action}
+      </div>
     </header>
   );
 }
