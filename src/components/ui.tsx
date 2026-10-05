@@ -58,7 +58,7 @@ export function PageHeader({
   wide?: boolean;
 }) {
   return (
-    <header className="sticky top-0 z-30 mb-4 ml-[calc(50%-50vw)] w-screen border-b border-line bg-bg/95 backdrop-blur">
+    <header className="sticky top-0 z-30 mb-4 ml-[calc(50%-50vw)] w-screen border-b border-line bg-bg/95 pt-[env(safe-area-inset-top)] backdrop-blur">
       <div className={`mx-auto flex min-h-14 items-center gap-2 px-4 ${wide ? "max-w-[74rem]" : "max-w-xl"}`}>
         {back && (
           <Link href={back} aria-label="戻る" className="-ml-2 flex h-11 w-11 items-center justify-center text-xl text-muted">
